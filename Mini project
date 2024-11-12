@@ -1,0 +1,166 @@
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.*;
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+public class PersonalFinanceTracker {
+
+    private static final String DATA_FILE = "expenses.json";
+
+    public static Map<String, List<Expense>> loadExpenses() {
+        Map<String, List<Expense>> expenses = new HashMap<>();
+        File file = new File(DATA_FILE);
+        if (file.exists()) {
+            try (FileReader reader = new FileReader(file);
+                 BufferedReader bufferedReader = new BufferedReader(reader)) {
+                StringBuilder content = new StringBuilder();
+                String line;
+                while ((line = bufferedReader.readLine()) != null) {
+                    content.append(line);
+                }
+
+                JSONObject jsonObject = new JSONObject(content.toString());
+                for (String category : jsonObject.keySet()) {
+                    JSONArray expenseArray = jsonObject.getJSONArray(category);
+                    List<Expense> expenseList = new ArrayList<>();
+                    for (int i = 0; i < expenseArray.length(); i++) {
+                        JSONObject expenseObj = expenseArray.getJSONObject(i);
+                        Expense expense = new Expense(
+                                expenseObj.getDouble("amount"),
+                                expenseObj.getString("description"),
+                                expenseObj.getString("date")
+                        );
+                        expenseList.add(expense);
+                    }
+                    expenses.put(category, expenseList);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return expenses;
+    }
+
+    public static void saveExpenses(Map<String, List<Expense>> expenses) {
+        JSONObject jsonObject = new JSONObject();
+        for (Map.Entry<String, List<Expense>> entry : expenses.entrySet()) {
+            JSONArray expenseArray = new JSONArray();
+            for (Expense expense : entry.getValue()) {
+                JSONObject expenseObj = new JSONObject();
+                expenseObj.put("amount", expense.getAmount());
+                expenseObj.put("description", expense.getDescription());
+                expenseObj.put("date", expense.getDate());
+                expenseArray.put(expenseObj);
+            }
+            jsonObject.put(entry.getKey(), expenseArray);
+        }
+
+        try (FileWriter writer = new FileWriter(DATA_FILE)) {
+            writer.write(jsonObject.toString(4));  // Pretty print with indent
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void addExpense(Map<String, List<Expense>> expenses, String category, double amount, String description) {
+        String date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        Expense newExpense = new Expense(amount, description, date);
+
+        expenses.computeIfAbsent(category, k -> new ArrayList<>()).add(newExpense);
+        saveExpenses(expenses);
+        System.out.println("Added expense of " + amount + " to category '" + category + "'.");
+    }
+
+    public static void viewExpenses(Map<String, List<Expense>> expenses) {
+        if (expenses.isEmpty()) {
+            System.out.println("No expenses found.");
+            return;
+        }
+
+        for (Map.Entry<String, List<Expense>> entry : expenses.entrySet()) {
+            System.out.println("Category: " + entry.getKey());
+            for (Expense expense : entry.getValue()) {
+                System.out.println("  Date: " + expense.getDate() + ", Amount: " + expense.getAmount() + ", Description: " + expense.getDescription());
+            }
+        }
+    }
+
+    public static void viewSummary(Map<String, List<Expense>> expenses) {
+        System.out.println("\nSummary of Expenses by Category:");
+        double totalExpenses = 0;
+        for (Map.Entry<String, List<Expense>> entry : expenses.entrySet()) {
+            double categoryTotal = entry.getValue().stream().mapToDouble(Expense::getAmount).sum();
+            totalExpenses += categoryTotal;
+            System.out.printf("  %s: $%.2f\n", entry.getKey(), categoryTotal);
+        }
+        System.out.printf("\nTotal Expenses: $%.2f\n", totalExpenses);
+    }
+
+   
+    public static void main(String[] args) {
+        Map<String, List<Expense>> expenses = loadExpenses();
+
+        Scanner scanner = new Scanner(System.in);
+
+        while (true) {
+            System.out.println("\nPersonal Finance Tracker");
+            System.out.println("1. Add Expense");
+            System.out.println("2. View Expenses");
+            System.out.println("3. View Expense Summary");
+            System.out.println("4. Exit");
+            System.out.print("Choose an option: ");
+
+            String choice = scanner.nextLine();
+
+            switch (choice) {
+                case "1":
+                    System.out.print("Enter the expense category: ");
+                    String category = scanner.nextLine();
+                    System.out.print("Enter the amount: ");
+                    double amount = Double.parseDouble(scanner.nextLine());
+                    System.out.print("Enter a description: ");
+                    String description = scanner.nextLine();
+                    addExpense(expenses, category, amount, description);
+                    break;
+                case "2":
+                    viewExpenses(expenses);
+                    break;
+                case "3":
+                    viewSummary(expenses);
+                    break;
+                case "4":
+                    System.out.println("Exiting...");
+                    scanner.close();
+                    return;
+                default:
+                    System.out.println("Invalid option. Please try again.");
+            }
+        }
+    }
+    public static class Expense {
+        private double amount;
+        private String description;
+        private String date;
+
+        public Expense(double amount, String description, String date) {
+            this.amount = amount;
+            this.description = description;
+            this.date = date;
+        }
+
+        public double getAmount() {
+            return amount;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public String getDate() {
+            return date;
+        }
+    }
+}
+
